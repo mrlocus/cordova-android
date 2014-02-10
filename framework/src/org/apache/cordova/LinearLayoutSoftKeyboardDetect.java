@@ -22,12 +22,12 @@ import org.apache.cordova.LOG;
 
 import android.content.Context;
 //import android.view.View.MeasureSpec;
-import android.widget.LinearLayout;
+import android.widget.FrameLayout;
 
 /**
  * This class is used to detect when the soft keyboard is shown and hidden in the web view.
  */
-public class LinearLayoutSoftKeyboardDetect extends LinearLayout {
+public class LinearLayoutSoftKeyboardDetect extends FrameLayout {
 
     private static final String TAG = "SoftKeyboardDetect";
 

@@ -56,6 +56,7 @@ import android.widget.ImageView;
 import android.webkit.ValueCallback;
 import android.webkit.WebViewClient;
 import android.widget.LinearLayout;
+import android.widget.RelativeLayout;
 
 /**
  * This class is the main Android activity that represents the Cordova
@@ -95,7 +96,8 @@ public class CordovaActivity extends Activity implements CordovaInterface {
     protected CordovaWebView appView;
     protected CordovaWebViewClient webViewClient;
 
-    protected LinearLayout root;
+    protected LinearLayoutSoftKeyboardDetect root;
+    protected LinearLayoutSoftKeyboardDetect.LayoutParams appViewParams;
     protected boolean cancelLoadUrl = false;
     protected ProgressDialog spinnerDialog = null;
     private final ExecutorService threadPool = Executors.newCachedThreadPool();
@@ -245,10 +247,11 @@ public class CordovaActivity extends Activity implements CordovaInterface {
         int height = display.getHeight();
 
         root = new LinearLayoutSoftKeyboardDetect(this, width, height);
-        root.setOrientation(LinearLayout.VERTICAL);
         root.setBackgroundColor(this.backgroundColor);
-        root.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.MATCH_PARENT, 0.0F));
+        root.setLayoutParams(new LinearLayoutSoftKeyboardDetect.LayoutParams(
+            LinearLayoutSoftKeyboardDetect.LayoutParams.MATCH_PARENT,
+            LinearLayoutSoftKeyboardDetect.LayoutParams.MATCH_PARENT
+        ));
 
         // Setup the hardware volume controls to handle volume control
         setVolumeControlStream(AudioManager.STREAM_MUSIC);
@@ -329,10 +332,12 @@ public class CordovaActivity extends Activity implements CordovaInterface {
         webViewClient.setWebView(this.appView);
         webChromeClient.setWebView(this.appView);
 
-        this.appView.setLayoutParams(new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                1.0F));
+        appViewParams = new LinearLayoutSoftKeyboardDetect.LayoutParams(
+            LinearLayoutSoftKeyboardDetect.LayoutParams.MATCH_PARENT,
+            LinearLayoutSoftKeyboardDetect.LayoutParams.MATCH_PARENT
+        );
+
+        this.appView.setLayoutParams(appViewParams);
 
         if (this.getBooleanProperty("DisallowOverscroll", false)) {
             if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.GINGERBREAD) {
