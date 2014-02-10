@@ -85,7 +85,15 @@ function copyJsAndLibrary(projectPath, shared, projectName) {
 
 function runAndroidUpdate(projectPath, target_api, shared) {
     var targetFrameworkDir = getFrameworkDir(projectPath, shared);
-    return exec('android update project --subprojects --path "' + projectPath + '" --target ' + target_api + ' --library "' + path.relative(projectPath, targetFrameworkDir) + '"');
+
+    var promise = exec('android update project --subprojects --path "' + projectPath + '" --target ' + target_api + ' --library "' + path.relative(projectPath, targetFrameworkDir) + '"');
+
+    promise.then(function() {
+        console.log('update cordovalib + gmslib project');
+        return exec('android update project --subprojects --path "' + getFrameworkDir(projectPath, false) + '" --target ' + target_api);
+    });
+
+    return promise;
 }
 
 function copyAntRules(projectPath) {
