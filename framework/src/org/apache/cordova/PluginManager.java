@@ -27,6 +27,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.cordova.CordovaArgs;
 import org.apache.cordova.CordovaWebView;
+import org.apache.cordova.CordovaActivity;
 import org.apache.cordova.CallbackContext;
 import org.apache.cordova.CordovaInterface;
 import org.apache.cordova.CordovaPlugin;
@@ -455,6 +456,25 @@ public class PluginManager {
                 });
                 return true;
             }
+
+            if ("showadview".equals(action)) {
+                ctx.getActivity().runOnUiThread(new Runnable() {
+                    public void run() {
+                        if(ctx.getActivity() instanceof CordovaActivity)
+                            ((CordovaActivity)ctx.getActivity()).showAdView(true);
+                    }
+                });
+            }
+
+            if ("hideadview".equals(action)) {
+                ctx.getActivity().runOnUiThread(new Runnable() {
+                    public void run() {
+                        if(ctx.getActivity() instanceof CordovaActivity)
+                            ((CordovaActivity)ctx.getActivity()).showAdView(false);
+                    }
+                });
+            }
+
             return false;
         }
     }

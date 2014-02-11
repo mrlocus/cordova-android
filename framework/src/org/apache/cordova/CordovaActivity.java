@@ -49,6 +49,7 @@ import android.view.KeyEvent;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
+import android.view.View.MeasureSpec;
 import android.view.ViewGroup;
 import android.view.Window;
 import android.view.WindowManager;
@@ -58,6 +59,9 @@ import android.webkit.WebViewClient;
 import android.widget.LinearLayout;
 import android.widget.RelativeLayout;
 
+import com.google.android.gms.ads.*;
+import android.view.Gravity;
+    
 /**
  * This class is the main Android activity that represents the Cordova
  * application.  It should be extended by the user to load the specific
@@ -95,6 +99,11 @@ public class CordovaActivity extends Activity implements CordovaInterface {
     // The webview for our app
     protected CordovaWebView appView;
     protected CordovaWebViewClient webViewClient;
+
+    private AdView mAdView;
+    private boolean mHasAd = false;
+    private Handler mHandler;
+    private int mAdHeightLast;
 
     protected LinearLayoutSoftKeyboardDetect root;
     protected LinearLayoutSoftKeyboardDetect.LayoutParams appViewParams;
@@ -219,6 +228,7 @@ public class CordovaActivity extends Activity implements CordovaInterface {
         LOG.i(TAG, "Apache Cordova native platform version " + appView.CORDOVA_VERSION + " is starting");
         LOG.d(TAG, "CordovaActivity.onCreate()");
         super.onCreate(savedInstanceState);
+        mHandler = new Handler();
 
         if(savedInstanceState != null)
         {
@@ -352,7 +362,137 @@ public class CordovaActivity extends Activity implements CordovaInterface {
 
         // Clear cancel flag
         this.cancelLoadUrl = false;
-        
+    }
+
+    private void initAdView(boolean reset) {
+        if(reset == true)
+            removeAdView();
+
+        if(mAdView != null)
+            return;
+
+        String adUnit = getStringProperty("AdUnit", null);
+
+        if(adUnit == null) {
+            LOG.d(TAG, "adUnit missing in config.xml");
+            return;
+        }
+
+        LOG.d(TAG, "adding AdView with adUnit " + adUnit);
+
+        mAdView = new AdView(this);
+        mAdView.setAdUnitId(adUnit);
+        mAdView.setAdSize(AdSize.SMART_BANNER);
+
+        mAdView.setLayoutParams(new LinearLayoutSoftKeyboardDetect.LayoutParams(
+            LinearLayoutSoftKeyboardDetect.LayoutParams.WRAP_CONTENT,
+            LinearLayoutSoftKeyboardDetect.LayoutParams.WRAP_CONTENT,
+            Gravity.BOTTOM
+        ));
+
+        mAdView.setVisibility(AdView.GONE);
+
+        mAdView.setAdListener(new AdListener() {
+            @Override
+            public void onAdLoaded() {
+                LOG.d(TAG, "ad loaded");
+                mHasAd = true;
+
+                runOnUiThread(new Runnable() {
+                    public void run() {
+                        mAdView.setVisibility(AdView.VISIBLE);
+
+                        runOnUiThread(new Runnable() {
+                            public void run() {
+                                updateAppViewMargin();
+                            }
+                        });
+                    }
+                });
+            }
+
+            @Override
+            public void onAdFailedToLoad(int error) {
+                LOG.d(TAG, "ad failed, error " + error);
+
+                // remove ad, if doesnt have one yet
+                // (if already showing ad, but refresh-request failed will still display old ad)
+                runOnUiThread(new Runnable() {
+                    public void run() {
+                        if(!mHasAd) {
+                            mAdView.setVisibility(AdView.GONE);
+                            updateAppViewMargin();
+                        }
+                    }
+                });
+            }
+        });
+
+        this.root.addView(mAdView);
+
+        // automatically send ad request when showing ad
+        AdRequest request = new AdRequest.Builder()
+            .addTestDevice(AdRequest.DEVICE_ID_EMULATOR)
+            .build();
+
+        mAdView.loadAd(request);
+    }
+
+    public void showAdView(final boolean show) {
+        LOG.d(TAG, "showAdView " + show);
+
+        runOnUiThread(new Runnable() {
+            public void run() {
+                if(show == true)
+                    initAdView(false);
+                else
+                    removeAdView();
+            }
+        });
+    }
+
+    public void removeAdView() {
+        LOG.d(TAG, "removeAdView");
+
+        if(mAdView == null)
+            return;
+
+        ViewGroup parent = (ViewGroup)mAdView.getParent();
+        parent.removeView(mAdView);
+        mAdView = null;
+        mHasAd = false;
+        updateAppViewMargin();
+    }
+
+    private void updateAppViewMargin() {
+        if(mAdView == null || mAdView.getVisibility() == AdView.GONE) {
+            appView.sendJavascript("if(window.changeAdViewHeight) { window.changeAdViewHeight(0); } else { console.log('cannot change adview height'); }");
+            mAdHeightLast = 0;
+            return;
+        }
+
+        int height = mAdView.getMeasuredHeight();
+
+        // not available yet, try again
+        if(height == 0) {
+            mHandler.postDelayed(new Runnable() {
+                public void run() {
+                    LOG.d(TAG, "try update margin again soon");
+                    updateAppViewMargin();
+                }
+            }, 250);
+        } else {
+            LOG.d(TAG, "set margin to " + height);
+
+            if(mAdHeightLast == height)
+                return;
+
+            appView.sendJavascript(
+                "if(window.changeAdViewHeight) { window.changeAdViewHeight(" + height + "); } else { console.log('cannot change adview height'); }"
+            );
+
+            mAdHeightLast = height;
+        }
     }
 
     /**
@@ -508,6 +648,10 @@ public class CordovaActivity extends Activity implements CordovaInterface {
     public void onConfigurationChanged(Configuration newConfig) {
         //don't reload the current page when the orientation is changed
         super.onConfigurationChanged(newConfig);
+
+        // having adview (means showadview command executed before)
+        if(mAdView != null)
+            initAdView(true);
     }
 
     /**
@@ -676,6 +820,9 @@ public class CordovaActivity extends Activity implements CordovaInterface {
      * Called when the system is about to start resuming a previous activity.
      */
     protected void onPause() {
+        if(mAdView != null)
+            mAdView.pause();
+
         super.onPause();
 
         LOG.d(TAG, "Paused the application!");
@@ -719,6 +866,8 @@ public class CordovaActivity extends Activity implements CordovaInterface {
 
         LOG.d(TAG, "Resuming the App");
         
+        if(mAdView != null)
+            mAdView.resume();
 
         //Code to test CB-3064
         String errorUrl = this.getStringProperty("ErrorUrl", null);
@@ -751,6 +900,9 @@ public class CordovaActivity extends Activity implements CordovaInterface {
      * The final call you receive before your activity is destroyed.
      */
     public void onDestroy() {
+        if(mAdView != null)
+            mAdView.destroy();
+
         LOG.d(TAG, "CordovaActivity.onDestroy()");
         super.onDestroy();
 
