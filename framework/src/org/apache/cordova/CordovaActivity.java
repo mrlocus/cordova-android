@@ -44,6 +44,9 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.util.Log;
+import android.widget.FrameLayout;
+import android.graphics.Rect;
+import android.view.ViewTreeObserver;
 import android.view.Display;
 import android.view.KeyEvent;
 import android.view.Menu;
@@ -359,6 +362,11 @@ public class CordovaActivity extends Activity implements CordovaInterface {
         this.appView.setVisibility(View.INVISIBLE);
         this.root.addView(this.appView);
         setContentView(this.root);
+
+        // only if fullscreen (else notification bar not taken into account on height calculation)
+        // confusion: both properties exist?
+        if(this.getBooleanProperty("SetFullscreen", false) || this.getBooleanProperty("Fullscreen", false))
+            AndroidBug5497Workaround.assistActivity(this);
 
         // Clear cancel flag
         this.cancelLoadUrl = false;
@@ -1336,6 +1344,83 @@ public class CordovaActivity extends Activity implements CordovaInterface {
         {
             String cClass = this.activityResultCallback.getClass().getName();
             outState.putString("callbackClass", cClass);
+        }
+    }
+
+    /**
+     * http://stackoverflow.com/questions/7417123/android-how-to-adjust-layout-in-full-screen-mode-when-softkeyboard-is-visible/19494006#19494006
+     *
+     * Now can use android:theme="@android:style/Theme.NoTitleBar.Fullscreen" with android:windowSoftInputMode="adjustResize"
+     * and it will correctly resize when softinput opened by WebView.
+     */
+    private static class AndroidBug5497Workaround {
+        // For more information, see https://code.google.com/p/android/issues/detail?id=5497
+        // To use this class, simply invoke assistActivity() on an Activity that already has its content view set.
+
+        public static void assistActivity (Activity activity) {
+            new AndroidBug5497Workaround(activity);
+        }
+
+        // view added by setContentView()
+        private View mSetContentView;
+
+        // topmost view for acitivity (its a PhoneDecorView), always takes full height of window
+        private View mRootView;
+
+        private int usableHeightPrevious, fullHeightPrevious;
+        private FrameLayout.LayoutParams setContentViewParams;
+
+        private AndroidBug5497Workaround(Activity activity) {
+            // parent/base (always FrameLayout) of view added by setContentView()
+            FrameLayout content = (FrameLayout) activity.findViewById(android.R.id.content);
+            mSetContentView = content.getChildAt(0);
+            mRootView = content.getRootView();
+
+            mSetContentView.getViewTreeObserver().addOnGlobalLayoutListener(new ViewTreeObserver.OnGlobalLayoutListener() {
+                public void onGlobalLayout() {
+                    possiblyResizeChildOfContent();
+                }
+            });
+
+            setContentViewParams = (FrameLayout.LayoutParams) mSetContentView.getLayoutParams();
+        }
+
+        // if height changed,
+        private void possiblyResizeChildOfContent() {
+            int usableHeight = computeUsableHeight();
+            int fullHeight = getRootViewHeight();
+            LOG.d(TAG, "usable height " + usableHeight + " prev " + usableHeightPrevious + " fullHeight " + fullHeight);
+
+            // visible screen height, or height minus keyboard changed
+            if (usableHeight != usableHeightPrevious || fullHeight != fullHeightPrevious) {
+                int heightDifference = fullHeight - usableHeight;
+                if (heightDifference > (fullHeight / 4)) {
+                    // keyboard probably just became visible
+                    //setContentViewParams.height = fullHeight - heightDifference;
+                    setContentViewParams.setMargins(0, 0, 0, heightDifference);
+                } else {
+                    // keyboard probably just became hidden
+                    //setContentViewParams.height = fullHeight;
+                    setContentViewParams.setMargins(0, 0, 0, 0);
+                }
+
+                mSetContentView.requestLayout();
+                usableHeightPrevious = usableHeight;
+                fullHeightPrevious = fullHeight;
+            }
+        }
+
+        // tells you the available area where content can be placed and remain visible to users
+        // (screenHeight - keyboard - bottomNavi - notificationBar)
+        private int computeUsableHeight() {
+            Rect r = new Rect();
+            mSetContentView.getWindowVisibleDisplayFrame(r);
+            return (r.bottom - r.top);
+        }
+
+        // getRootView() is the 
+        private int getRootViewHeight() {
+            return mRootView.getHeight();
         }
     }
 }
