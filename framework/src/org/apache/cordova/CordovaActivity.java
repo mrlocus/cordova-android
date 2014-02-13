@@ -370,6 +370,8 @@ public class CordovaActivity extends Activity implements CordovaInterface {
 
         // Clear cancel flag
         this.cancelLoadUrl = false;
+
+        getWindow().setBackgroundDrawable(null);
     }
 
     private void initAdView(boolean reset) {
