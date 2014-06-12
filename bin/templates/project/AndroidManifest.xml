@@ -49,5 +49,5 @@
             android:configChanges="keyboard|keyboardHidden|orientation|screenLayout|uiMode|screenSize|smallestScreenSize"/>
     </application>
 
-    <uses-sdk android:minSdkVersion="10" android:targetSdkVersion="__APILEVEL__"/>
+    <uses-sdk android:minSdkVersion="14" android:targetSdkVersion="__APILEVEL__"/>
 </manifest>
