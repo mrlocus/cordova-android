@@ -142,23 +142,8 @@ def doExtractStringFromManifest(name) {
 
 def doPromptForPassword(msg) {
     if (System.console() == null) {
-        def ret = null
-        new SwingBuilder().edt {
-            dialog(modal: true, title: 'Enter password', alwaysOnTop: true, resizable: false, locationRelativeTo: null, pack: true, show: true) {
-                vbox {
-                    label(text: msg)
-                    def input = passwordField()
-                    button(defaultButton: true, text: 'OK', actionPerformed: {
-                        ret = input.password;
-                        dispose();
-                    })
-                }
-            }
-        }
-        if (!ret) {
-            throw new GradleException('User canceled build')
-        }
-        return new String(ret)
+        ant.input(message: 'Enter keystore password:', addproperty: 'userInputPassword', defaultValue : '')
+        return new String(ant.properties.userInputPassword)
     } else {
         return System.console().readPassword('\n' + msg);
     }
